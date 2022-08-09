@@ -194,7 +194,7 @@ COPY_LANES_TO_DISPLAY:
 	# lane 2
 	la $a0, lane2
 	addi $a0, $a0, 528
-	addi $a1, $s1, 72
+	addi $a1, $s1, 76
 	jal copy_lane
 	
 	# NEED TO MODIFY LANE 3 AND 4 TO INVERT COPY
@@ -207,7 +207,7 @@ COPY_LANES_TO_DISPLAY:
 	# lane 4
 	la $a0, lane4
 	addi $a0, $a0, 528
-	addi $a1, $s1, 204
+	addi $a1, $s1, 200
 	jal copy_lane
 	
 	lw $ra, 0($sp)		# pop $ra
