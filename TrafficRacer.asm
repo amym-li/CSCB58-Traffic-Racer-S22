@@ -207,7 +207,7 @@ COPY_LANES_TO_DISPLAY:
 	# lane 4
 	la $a0, lane4
 	addi $a0, $a0, 528
-	addi $a1, $s1, 200
+	addi $a1, $s1, 204
 	jal copy_lane
 	
 	lw $ra, 0($sp)		# pop $ra
@@ -536,19 +536,19 @@ generate_in_lane: # $a0 = address of lane array
 	lw $t1, 8($a0)
 	lw $t2, 16($a0)
 	
-	# only generates a car if $a0 = 0
-	li $v0, 42  
-	li $a0, 0  
-	li $a1, 5	# INCREASE TO DECREASE SPAWN RATE
-	syscall
-	bne $a0, 5, generate_return
-	
 	beq $t2, -1, generate1
 	beq $t1, -1, generate2
 	beq $t0, -1, generate3
 generate_return: jr $ra
 
 generate1:
+	# only generates a car if $a0 = 0
+	li $v0, 42  
+	li $a0, 0  
+	li $a1, 2	# INCREASE TO DECREASE SPAWN RATE
+	syscall
+	bne $a0, 1, generate_return
+	
 	li $v0, 42  
 	li $a0, 0  
 	li $a1, 6 # random position [0, 6]
@@ -566,8 +566,17 @@ generate1:
 	j generate_return
 	
 generate2:
+
+	# only generates a car if $a0 = 0
+	# reduces the chance of 2 cars in one lane
+	li $v0, 42  
+	li $a0, 0  
+	li $a1, 20	# INCREASE TO DECREASE SPAWN RATE
+	syscall
+	bne $a0, 17, generate_return
+	
 	div $t4, $t2, 48
-	ble $t4, 20, generate_return
+	ble $t4, 25, generate_return
 	
 	li $v0, 42  
 	li $a0, 0  
@@ -587,8 +596,17 @@ generate2:
 	j generate_return
 
 generate3:
+
+	# only generates a car if $a0 = 0
+	# reduces the chance of 3 cars in one lane
+	li $v0, 42  
+	li $a0, 0  
+	li $a1, 50	# INCREASE TO DECREASE SPAWN RATE
+	syscall
+	bne $a0, 41, generate_return
+	
 	div $t6, $t1, 48
-	ble $t6, 20, generate_return
+	ble $t6, 25, generate_return
 	
 	li $v0, 42  
 	li $a0, 0  
