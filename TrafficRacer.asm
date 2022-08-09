@@ -438,17 +438,17 @@ update_left_lane: # $a0 = address of lane array
 	
 update_left_cond: 
 
-	blt $t5, 3552, update_left_return
+	blt $t5, 3600, update_left_return
 	# need to shift
 	li $t9, -1
 	
-	lw $t9, 0($t0)
-	lw $t9, 4($t0)
+	sw $t9, 0($t0)
+	sw $t9, 4($t0)
 	
-	lw $t1, 8($t0)
-	lw $t2, 12($t0)
-	lw $t3, 16($t0)
-	lw $t4, 20($t0)
+	sw $t1, 8($t0)
+	sw $t2, 12($t0)
+	sw $t3, 16($t0)
+	sw $t4, 20($t0)
 	jr $ra
 
 update_left_return: 
@@ -539,9 +539,9 @@ generate_in_lane: # $a0 = address of lane array
 	# only generates a car if $a0 = 0
 	li $v0, 42  
 	li $a0, 0  
-	li $a1, 2	# INCREASE TO DECREASE SPAWN RATE
+	li $a1, 5	# INCREASE TO DECREASE SPAWN RATE
 	syscall
-	bne $a0, 0, generate_return
+	bne $a0, 5, generate_return
 	
 	beq $t2, -1, generate1
 	beq $t1, -1, generate2
