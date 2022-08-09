@@ -28,7 +28,7 @@
 .data
 
 mockDisplay:		.space	16384
-lane1:			.space 	4128 # 12 by 64
+lane1:			.space 	4128 # 12 by 86
 lane2:			.space	4128
 lane3:			.space	4128
 lane4:			.space 	4128
@@ -59,11 +59,11 @@ roadside_collision:	.word	0 # 0 for false, 1 for true
 
 # incoming car positions - top left pixel (in lane displays), speed, ...
 # store such that A[0] is closest to spawn point
-lane1_cars:	.word	0, 0, 0, 0, 0, 0
-lane2_cars:	.word	0, 0, 0, 0, 0, 0
-lane3_cars:	.word	0, 0, 0, 0, 0, 0
-lane4_cars:	.word	0, 0, 0, 0, 0, 0
-max_cars_per_lane:	.word	3
+lane1_cars:	.space	24
+lane2_cars:	.space	24
+lane3_cars:	.space	24
+lane4_cars:	.space	24
+# max_cars_per_lane:	.word	3
 
 .text
 
@@ -92,6 +92,8 @@ new_game:
 	li $s6, 1		# starting speed 1
 	li $s7, 0		# current cycles = 0
 	
+	jal initialize_lane_arrays
+	
 	jal DRAW_START_BKGD	# colors in pavement and draws road lines
 	jal DRAW_PLAYER_CAR
 	jal DRAW_HEARTS
@@ -99,14 +101,11 @@ new_game:
 	
 main_loop: 
 
-	jal ERASE_CAR
+	jal ERASE_PLAYER_CAR
 	jal ERASE_HEARTS
 	
 	jal draw_road_lines
 	jal draw_white_dashes
-	
-	jal DRAW_HEARTS
-	jal DRAW_PROGRESS_BAR
 	
 	jal GENERATE_CARS
 	
@@ -119,6 +118,15 @@ main_loop:
 	# check for collision
 	
 	# update location of other vehicles
+	jal CLEAR_LANES
+	jal UPDATE_BLUE_CARS
+	jal DRAW_BLUE_CARS
+	jal COPY_LANES_TO_DISPLAY
+	
+	jal DRAW_PLAYER_CAR
+		
+	jal DRAW_HEARTS
+	jal DRAW_PROGRESS_BAR
 	
 	# redraw screen
 	jal DISPLAY_SCREEN
@@ -131,26 +139,12 @@ main_loop:
 	li $a0, 100
 	syscall 
 	
-	bgt $s7, 1000, end	# CHANGE IF CHANGING MAX CYCLES
+	bgt $s7, 1001, end	# CHANGE IF CHANGING MAX CYCLES
 	j main_loop
 
 j end
 
-####################################
-DISPLAY_SCREEN:
-	
-	add $t0, $s1, $zero	# $t0 = base address of mockDisplay
-	add $t1, $s2, $zero	# $t1 = end address of mockDisplay
-	add $t2, $s0, $zero	# $t2 = base address of actual display
-	
-	display_screen_loop:
-		lw $t3, 0($t0)	# $t3 = color code
-		sw $t3, 0($t2)
-		
-		addi $t0, $t0, 4
-		addi $t2, $t2, 4
-		blt $t0, $t1, display_screen_loop
-	jr $ra
+
 	
 ####################################
 CHECK_KEYPRESS:
@@ -176,7 +170,7 @@ move_right:
 	j keypress_done
 	
 speed_up:
-	beq $s6, 3, keypress_done
+	beq $s6, 4, keypress_done
 	addi $s6, $s6, 1
 	j keypress_done
 	
@@ -185,110 +179,334 @@ slow_down:
 	addi $s6, $s6, -1
 	j keypress_done
 
-####################################
-DRAW_PROGRESS_BAR:
-	# draws skeleton of progress bar
-	lw $t0, pbar_border_color
-	li $t8, 0xFFFFFF
-	li $t9, 0x000000
-	
-	sw $t0, 904($s1)
-	sw $t0, 1008($s1)
-	sw $t0, 1160($s1)
-	sw $t0, 1264($s1)
-	
-	sw $t8, 1000($s1)
-	sw $t9, 1004($s1)
-	sw $t9, 1256($s1)
-	sw $t8, 1260($s1)
+###################################
 
-	addi $t1, $s1, 652
-	li $t2, 0 # i = 0
-	pb_loop1:
-		sw $t0, 0($t1)
-		sw $t0, 768($t1)
-		addi $t1, $t1, 4
-		addi $t2, $t2, 1
-		blt $t2, 25, pb_loop1
+COPY_LANES_TO_DISPLAY:
+	addi $sp, $sp, -4	# push $ra
+	sw $ra, 0($sp)
 	
-	# colors in progress
-	lw $t0, pbar_color
-	addi $t1, $s1, 908
-	div $t3, $s7, 40	# CHANGE IF CHANGING MAX CYCLES
-	li $t2, 0 # j = 0
-	pb_loop2:
-		sw $t0, 0($t1)
-		sw $t0, 256($t1)
-		addi $t1, $t1, 4
-		addi $t2, $t2, 1	
-		blt $t2, $t3, pb_loop2
+	# lane 1
+	la $a0, lane1
+	addi $a0, $a0, 528
+	addi $a1, $s1, 12
+	jal copy_lane
+	
+	# lane 2
+	la $a0, lane2
+	addi $a0, $a0, 528
+	addi $a1, $s1, 72
+	jal copy_lane
+	
+	# NEED TO MODIFY LANE 3 AND 4 TO INVERT COPY
+	# lane 3
+	la $a0, lane3
+	addi $a0, $a0, 528
+	addi $a1, $s1, 140
+	jal copy_lane
+	
+	# lane 4
+	la $a0, lane4
+	addi $a0, $a0, 528
+	addi $a1, $s1, 200
+	jal copy_lane
+	
+	lw $ra, 0($sp)		# pop $ra
+	addi $sp, $sp, 4
 	jr $ra
 
-#####################################
-ERASE_HEARTS:
-	addi $t0, $s1, 528 # top left pixel
-	lw $t1, pavement_color
-	li $t2, 0 # j = 0
+copy_lane: 
+	# $a0 = address of the top left pixel of part of lane display to be copied
+	# $a1 = address of top left pixel of area to copy to
+	# area to be copied is 12x64
+
+	add $t0, $a0, $zero
+	add $t1, $a1, $zero
+	li $t2, 0
+copy_lane_loop:
+	lw $t3, 0($t0)
+	sw $t3, 0($t1)
+	lw $t3, 4($t0)
+	sw $t3, 4($t1)
+	lw $t3, 8($t0)
+	sw $t3, 8($t1)
+	lw $t3, 12($t0)
+	sw $t3, 12($t1)
+	lw $t3, 16($t0)
+	sw $t3, 16($t1)
+	lw $t3, 20($t0)
+	sw $t3, 20($t1)
+	lw $t3, 24($t0)
+	sw $t3, 24($t1)
+	lw $t3, 28($t0)
+	sw $t3, 28($t1)
+	lw $t3, 32($t0)
+	sw $t3, 32($t1)
+	lw $t3, 36($t0)
+	sw $t3, 36($t1)
+	lw $t3, 40($t0)
+	sw $t3, 40($t1)
+	lw $t3, 44($t0)
+	sw $t3, 44($t1)
 	
-erase_hearts_loop:
-	sw $t1, 0($t0)
-	sw $t1, 256($t0)
-	sw $t1, 512($t0)
-	sw $t1, 768($t0)
-	sw $t1, 1024($t0)
-	sw $t1, 1280($t0)
+	addi $t0, $t0, 48
+	addi $t1, $t1, 256
+	
 	addi $t2, $t2, 1
-	blt $t2, 25, erase_hearts_loop
+	blt $t2, 64, copy_lane_loop
+	
 	jr $ra
 	
-DRAW_HEARTS: 
-	add $t4, $s4, $zero
-	addi $t0, $s1, 528 # top left pixel
-	lw $t1, red
-	lw $t2, white
-	lw $t3, pavement_color
+###################################
+DRAW_BLUE_CARS:
+	addi $sp, $sp, -4	# push $ra
+	sw $ra, 0($sp)
+
+draw_l1_cars:
+	# lane 1
+	la $t0, lane1_cars
+	lw $t1, 0($t0)
+	lw $t2, 8($t0)
+	lw $t3, 16($t0)
 	
-hearts_loop:
-	sw $t1, 4($t0)
-	sw $t1, 8($t0)
-	sw $t3, 12($t0)
-	sw $t1, 256($t0)
-	sw $t2, 260($t0)
-	sw $t1, 264($t0)
-	sw $t1, 268($t0)
-	sw $t1, 512($t0)
-	sw $t1, 516($t0)
-	sw $t1, 520($t0)
-	sw $t1, 524($t0)
-	sw $t1, 772($t0)
-	sw $t1, 776($t0)
-	sw $t1, 780($t0)
-	sw $t1, 1032($t0)
-	sw $t1, 1036($t0)
-	sw $t1, 1292($t0)
+	beq $t3, -1, draw_l2_cars
+	la $a1, lane1
+	add $a0, $t3, $zero
+	jal draw_down_car
+	beq $t2, -1, draw_l2_cars
+	add $a0, $t2, $zero
+	jal draw_down_car
+	beq $t1, -1, draw_l2_cars
+	add $a0, $t1, $zero
+	jal draw_down_car
+
+draw_l2_cars:
 	
-	addi $t4, $t4, -1
-	beq $t4, $zero, hearts_done
+	# lane 2
+	la $t0, lane2_cars
+	lw $t1, 0($t0)
+	lw $t2, 8($t0)
+	lw $t3, 16($t0)
 	
-	sw $t1, 16($t0)
-	sw $t1, 20($t0)
-	sw $t1, 272($t0)
-	sw $t1, 276($t0)
-	sw $t1, 280($t0)
-	sw $t1, 528($t0)
-	sw $t1, 532($t0)
-	sw $t1, 536($t0)
-	sw $t1, 784($t0)
-	sw $t1, 788($t0)
-	sw $t1, 1040($t0)
+	beq $t3, -1, draw_l3_cars
+	la $a1, lane2
+	add $a0, $t3, $zero
+	jal draw_down_car
+	beq $t2, -1, draw_l3_cars
+	add $a0, $t2, $zero
+	jal draw_down_car
+	beq $t1, -1, draw_l3_cars
+	add $a0, $t1, $zero
+	jal draw_down_car
+
+draw_l3_cars:
 	
-	addi $t4, $t4, -1
-	addi $t0, $t0, 36
-	bgt $t4, $zero, hearts_loop
-hearts_done:	jr $ra
+	# lane 3
+	la $t0, lane3_cars
+	lw $t1, 0($t0)
+	lw $t2, 8($t0)
+	lw $t3, 16($t0)
+	
+	beq $t3, -1, draw_l4_cars
+	la $a1, lane3
+	add $a0, $t3, $zero
+	jal draw_down_car
+	beq $t2, -1, draw_l4_cars
+	add $a0, $t2, $zero
+	jal draw_down_car
+	beq $t1, -1, draw_l4_cars
+	add $a0, $t1, $zero
+	jal draw_down_car
+
+draw_l4_cars:
+
+	# lane 4
+	la $t0, lane4_cars
+	lw $t1, 0($t0)
+	lw $t2, 8($t0)
+	lw $t3, 16($t0)
+	
+	beq $t3, -1, draw_blue_done
+	la $a1, lane4
+	add $a0, $t3, $zero
+	jal draw_down_car
+	beq $t2, -1, draw_blue_done
+	add $a0, $t2, $zero
+	jal draw_down_car
+	beq $t1, -1, draw_blue_done
+	add $a0, $t1, $zero
+	jal draw_down_car
+	
+draw_blue_done:
+	lw $ra, 0($sp)		# pop $ra
+	addi $sp, $sp, 4
+	jr $ra
+	
+draw_down_car:
+	# $a0 = car position in lane display
+	# $a1 = address of lane display
+	
+	# draws 6x11 rectangle
+	add $t8, $a0, $a1
+	lw $t9, blue
+	li $t7, 0 # i = 0
+	draw_rect_loop:
+		sw $t9, 0($t8)
+		sw $t9, 4($t8)
+		sw $t9, 8($t8)
+		sw $t9, 12($t8)
+		sw $t9, 16($t8)
+		sw $t9, 20($t8)
+		addi $t8, $t8, 48
+		addi $t7, $t7, 1
+		blt $t7, 11, draw_rect_loop # while i < 11
+
+	# draws windows
+	add $t8, $a0, $a1
+	lw $t9, window_blue
+	sw $t9, 100($t8)
+	sw $t9, 104($t8)
+	sw $t9, 108($t8)
+	sw $t9, 112($t8)
+	sw $t9, 148($t8)
+	sw $t9, 152($t8)
+	sw $t9, 156($t8)
+	sw $t9, 160($t8)
+	
+	sw $t9, 292($t8)
+	sw $t9, 296($t8)
+	sw $t9, 300($t8)
+	sw $t9, 304($t8)
+	sw $t9, 340($t8)
+	sw $t9, 344($t8)
+	sw $t9, 348($t8)
+	sw $t9, 352($t8)
+	
+	jr $ra
+
+	
+###################################
+
+UPDATE_BLUE_CARS:
+	addi $sp, $sp, -4	# push $ra
+	sw $ra, 0($sp)
+	
+	la $a0, lane1_cars
+	jal update_left_lane
+	
+	la $a0, lane2_cars
+	jal update_left_lane
+	
+	# NEED TO IMPLEMENT UPDATE RIGHT LANE
+	
+	lw $ra, 0($sp)		# pop $ra
+	addi $sp, $sp, 4
+	
+	jr $ra
+	
+update_left_lane: # $a0 = address of lane array
+	li $t9, 48
+
+	add $t0, $a0, $zero
+	lw $t1, 0($t0) # car 3
+	lw $t2, 4($t0)
+	lw $t3, 8($t0) # car 2
+	lw $t4, 12($t0)
+	lw $t5, 16($t0) # car 1
+	lw $t6, 20($t0)
+	
+	# car 1
+	beq $t5, -1, update_left_cond
+	add $t7, $t6, $s6
+	mult $t7, $t9
+	mflo $t7
+	add $t5, $t5, $t7
+	
+	# car 2
+	beq $t3, -1, update_left_cond
+	add $t7, $t4, $s6
+	mult $t7, $t9
+	mflo $t7
+	add $t3, $t3, $t7
+	
+	# car 3
+	beq $t1, -1, update_left_cond
+	add $t7, $t2, $s6
+	mult $t7, $t9
+	mflo $t7
+	add $t1, $t1, $t7
+	
+	
+update_left_cond: 
+
+	blt $t5, 3552, update_left_return
+	# need to shift
+	li $t9, -1
+	
+	lw $t9, 0($t0)
+	lw $t9, 4($t0)
+	
+	lw $t1, 8($t0)
+	lw $t2, 12($t0)
+	lw $t3, 16($t0)
+	lw $t4, 20($t0)
+	jr $ra
+
+update_left_return: 
+	sw $t1, 0($t0)
+	sw $t3, 8($t0)
+	sw $t5, 16($t0)
+	jr $ra
 
 ###################################
 
+CLEAR_LANES:
+
+	addi $sp, $sp, -4	# push $ra
+	sw $ra, 0($sp)
+	
+	la $a0, lane1
+	jal clear_lane
+	
+	la $a0, lane2
+	jal clear_lane
+	
+	la $a0, lane3
+	jal clear_lane
+	
+	la $a0, lane4
+	jal clear_lane
+	
+	lw $ra, 0($sp)		# pop $ra
+	addi $sp, $sp, 4
+	
+	jr $ra
+
+clear_lane: # $a0 = address of lane display
+	addi $t0, $a0, 528
+	li $t1, 0
+	lw $t2, pavement_color
+	
+clear_lane_loop:
+	sw $t2, 0($t0)
+	sw $t2, 4($t0)
+	sw $t2, 8($t0)
+	sw $t2, 12($t0)
+	sw $t2, 16($t0)
+	sw $t2, 20($t0)
+	sw $t2, 24($t0)
+	sw $t2, 28($t0)
+	sw $t2, 32($t0)
+	sw $t2, 36($t0)
+	sw $t2, 40($t0)
+	sw $t2, 44($t0)
+	
+	addi $t0, $t0, 48
+	addi $t1, $t1, 1
+	blt $t1, 64, clear_lane_loop
+
+	jr $ra
+
+###################################
 GENERATE_CARS:
 
 	addi $sp, $sp, -4	# push $ra
@@ -311,8 +529,7 @@ GENERATE_CARS:
 	
 	jr $ra
 
-generate_in_lane:	
-	# $a0 = address of lane array
+generate_in_lane: # $a0 = address of lane array
 	add $t9, $a0, $zero
 	
 	lw $t0, 0($a0)
@@ -322,13 +539,13 @@ generate_in_lane:
 	# only generates a car if $a0 = 0
 	li $v0, 42  
 	li $a0, 0  
-	li $a1, 1
+	li $a1, 2	# INCREASE TO DECREASE SPAWN RATE
 	syscall
 	bne $a0, 0, generate_return
 	
-	beq $t2, $zero, generate1
-	beq $t1, $zero, generate2
-	beq $t0, $zero, generate3
+	beq $t2, -1, generate1
+	beq $t1, -1, generate2
+	beq $t0, -1, generate3
 generate_return: jr $ra
 
 generate1:
@@ -391,47 +608,7 @@ generate3:
 	j generate_return
 		
 ###################################
-DRAW_LLANE_CAR:
-	# $a0 = car position
-	add $t0, $a0, $zero	# $t0 = car position
-	addi $sp, $sp, -4	# push $ra
-	sw $ra, 0($sp)
-	
-	lw $a1, blue	# blue for opponent car
-	jal draw_car_rect
-	
-	addi $a0, $t0, 516
-	jal draw_window
-	
-	addi $a0, $t0, 1540
-	jal draw_window
-	
-	lw $ra, 0($sp)		# pop $ra
-	addi $sp, $sp, 4
-	
-	jr $ra
-	
-DRAW_RLANE_CAR:
-	# $a0 = car position
-	add $t0, $a0, $zero	# $t0 = car position
-	addi $sp, $sp, -4	# push $ra
-	sw $ra, 0($sp)
-	
-	lw $a1, blue	# blue for opponent car
-	jal draw_car_rect
-	
-	addi $a0, $t0, 772
-	jal draw_window
-	
-	addi $a0, $t0, 1796
-	jal draw_window
-	
-	lw $ra, 0($sp)		# pop $ra
-	addi $sp, $sp, 4
-	
-	jr $ra
-	
-###################################
+
 DRAW_PLAYER_CAR: # car is 6x11
 	addi $sp, $sp, -4	# push $ra
 	sw $ra, 0($sp)
@@ -480,11 +657,11 @@ draw_window: # draws a 2x4 rect
 	sw $t0, 268($a0)
 	jr $ra
 
-ERASE_CAR: 
+ERASE_PLAYER_CAR: 
 	add $t0, $s5, $zero
 	lw $t1, pavement_color
 	li $t3, 0 # i = 0
-erase_car_loop:
+erase_player_loop:
 	sw $t1, 0($t0)
 	sw $t1, 4($t0)
 	sw $t1, 8($t0)
@@ -493,7 +670,7 @@ erase_car_loop:
 	sw $t1, 20($t0)
 	addi $t0, $t0, 256
 	addi $t3, $t3, 1
-	blt $t3, 11, erase_car_loop # while i < 11
+	blt $t3, 11, erase_player_loop # while i < 11
 	jr $ra
 	
 ##############################
@@ -614,6 +791,161 @@ draw_white_dashes:
 		addi $t2, $t2, 2048
 		
 		blt $t2, $s2, white_dash_loop
+	jr $ra
+	
+#####################################
+ERASE_HEARTS:
+	addi $t0, $s1, 528 # top left pixel
+	lw $t1, pavement_color
+	li $t2, 0 # j = 0
+	
+erase_hearts_loop:
+	sw $t1, 0($t0)
+	sw $t1, 256($t0)
+	sw $t1, 512($t0)
+	sw $t1, 768($t0)
+	sw $t1, 1024($t0)
+	sw $t1, 1280($t0)
+	addi $t2, $t2, 1
+	blt $t2, 25, erase_hearts_loop
+	jr $ra
+	
+DRAW_HEARTS: 
+	add $t4, $s4, $zero
+	addi $t0, $s1, 528 # top left pixel
+	lw $t1, red
+	lw $t2, white
+	lw $t3, pavement_color
+	
+hearts_loop:
+	sw $t1, 4($t0)
+	sw $t1, 8($t0)
+	sw $t3, 12($t0)
+	sw $t1, 256($t0)
+	sw $t2, 260($t0)
+	sw $t1, 264($t0)
+	sw $t1, 268($t0)
+	sw $t1, 512($t0)
+	sw $t1, 516($t0)
+	sw $t1, 520($t0)
+	sw $t1, 524($t0)
+	sw $t1, 772($t0)
+	sw $t1, 776($t0)
+	sw $t1, 780($t0)
+	sw $t1, 1032($t0)
+	sw $t1, 1036($t0)
+	sw $t1, 1292($t0)
+	
+	addi $t4, $t4, -1
+	beq $t4, $zero, hearts_done
+	
+	sw $t1, 16($t0)
+	sw $t1, 20($t0)
+	sw $t1, 272($t0)
+	sw $t1, 276($t0)
+	sw $t1, 280($t0)
+	sw $t1, 528($t0)
+	sw $t1, 532($t0)
+	sw $t1, 536($t0)
+	sw $t1, 784($t0)
+	sw $t1, 788($t0)
+	sw $t1, 1040($t0)
+	
+	addi $t4, $t4, -1
+	addi $t0, $t0, 36
+	bgt $t4, $zero, hearts_loop
+hearts_done:	jr $ra
+
+
+####################################
+DRAW_PROGRESS_BAR:
+	# draws skeleton of progress bar
+	lw $t0, pbar_border_color
+	li $t8, 0xFFFFFF
+	li $t9, 0x000000
+	
+	sw $t0, 904($s1)
+	sw $t0, 1008($s1)
+	sw $t0, 1160($s1)
+	sw $t0, 1264($s1)
+	
+	sw $t8, 1000($s1)
+	sw $t9, 1004($s1)
+	sw $t9, 1256($s1)
+	sw $t8, 1260($s1)
+
+	addi $t1, $s1, 652
+	li $t2, 0 # i = 0
+	pb_loop1:
+		sw $t0, 0($t1)
+		sw $t0, 768($t1)
+		addi $t1, $t1, 4
+		addi $t2, $t2, 1
+		blt $t2, 25, pb_loop1
+	
+	# colors in progress
+	lw $t0, pbar_color
+	addi $t1, $s1, 908
+	div $t3, $s7, 40	# CHANGE IF CHANGING MAX CYCLES
+	li $t2, 0 # j = 0
+	pb_loop2:
+		sw $t0, 0($t1)
+		sw $t0, 256($t1)
+		addi $t1, $t1, 4
+		addi $t2, $t2, 1	
+		blt $t2, $t3, pb_loop2
+	
+	lw $t0, pavement_color
+	pb_loop3: 
+		bge $t2, 23, pb_done
+		sw $t0, 0($t1)
+		sw $t0, 256($t1)
+		addi $t1, $t1, 4
+		addi $t2, $t2, 1	
+		j pb_loop3
+	pb_done: jr $ra
+
+####################################
+
+initialize_lane_arrays:
+	li $t1, -1
+	
+	la $t0, lane1_cars
+	sw $t1, 0($t0)
+	sw $t1, 8($t0)
+	sw $t1, 16($t0)
+	
+	la $t0, lane2_cars
+	sw $t1, 0($t0)
+	sw $t1, 8($t0)
+	sw $t1, 16($t0)
+	
+	la $t0, lane3_cars
+	sw $t1, 0($t0)
+	sw $t1, 8($t0)
+	sw $t1, 16($t0)
+	
+	la $t0, lane4_cars
+	sw $t1, 0($t0)
+	sw $t1, 8($t0)
+	sw $t1, 16($t0)
+	
+	jr $ra
+
+####################################
+DISPLAY_SCREEN:
+	
+	add $t0, $s1, $zero	# $t0 = base address of mockDisplay
+	add $t1, $s2, $zero	# $t1 = end address of mockDisplay
+	add $t2, $s0, $zero	# $t2 = base address of actual display
+	
+	display_screen_loop:
+		lw $t3, 0($t0)	# $t3 = color code
+		sw $t3, 0($t2)
+		
+		addi $t0, $t0, 4
+		addi $t2, $t2, 4
+		blt $t0, $t1, display_screen_loop
 	jr $ra
 
 end:	li $v0, 10
