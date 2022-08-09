@@ -28,6 +28,10 @@
 .data
 
 mockDisplay:		.space	16384
+lane1:			.space 	4128 # 12 by 64
+lane2:			.space	4128
+lane3:			.space	4128
+lane4:			.space 	4128
 
 displayAddress:		.word	0x10008000
 displayAddressEnd:	.word	0x1000C000
@@ -53,11 +57,13 @@ window_blue:	.word 	0xbee9fa
 #car_starting_pos:	.word	0x10009D70
 roadside_collision:	.word	0 # 0 for false, 1 for true
 
-# incoming car positions - top left pixel
-lane1_car1:	.word	0
-lane2_car1:	.word	0
-lane3_car1:	.word	0
-lane4_car1:	.word	0
+# incoming car positions - top left pixel (in lane displays), speed, ...
+# store such that A[0] is closest to spawn point
+lane1_cars:	.word	0, 0, 0, 0, 0, 0
+lane2_cars:	.word	0, 0, 0, 0, 0, 0
+lane3_cars:	.word	0, 0, 0, 0, 0, 0
+lane4_cars:	.word	0, 0, 0, 0, 0, 0
+max_cars_per_lane:	.word	3
 
 .text
 
@@ -101,6 +107,8 @@ main_loop:
 	
 	jal DRAW_HEARTS
 	jal DRAW_PROGRESS_BAR
+	
+	jal GENERATE_CARS
 	
 	# keyboard input here
 	jal CHECK_KEYPRESS
@@ -281,8 +289,148 @@ hearts_done:	jr $ra
 
 ###################################
 
-DRAW_LLANE_CAR:
+GENERATE_CARS:
 
+	addi $sp, $sp, -4	# push $ra
+	sw $ra, 0($sp)
+	
+	la $a0, lane1_cars
+	jal generate_in_lane
+	
+	la $a0, lane2_cars
+	jal generate_in_lane
+	
+	la $a0, lane3_cars
+	jal generate_in_lane
+	
+	la $a0, lane4_cars
+	jal generate_in_lane
+	
+	lw $ra, 0($sp)		# pop $ra
+	addi $sp, $sp, 4
+	
+	jr $ra
+
+generate_in_lane:	
+	# $a0 = address of lane array
+	add $t9, $a0, $zero
+	
+	lw $t0, 0($a0)
+	lw $t1, 8($a0)
+	lw $t2, 16($a0)
+	
+	# only generates a car if $a0 = 0
+	li $v0, 42  
+	li $a0, 0  
+	li $a1, 1
+	syscall
+	bne $a0, 0, generate_return
+	
+	beq $t2, $zero, generate1
+	beq $t1, $zero, generate2
+	beq $t0, $zero, generate3
+generate_return: jr $ra
+
+generate1:
+	li $v0, 42  
+	li $a0, 0  
+	li $a1, 6 # random position [0, 6]
+	syscall
+	
+	sll $a0, $a0, 2 # multiply by 4
+	sw $a0, 16($t9)
+	
+	li $v0, 42  
+	li $a0, 0  
+	li $a1, 2 # random speed [0, 2]
+	syscall
+	
+	sw $a0, 20($t9)
+	j generate_return
+	
+generate2:
+	div $t4, $t2, 48
+	ble $t4, 20, generate_return
+	
+	li $v0, 42  
+	li $a0, 0  
+	li $a1, 6 # random position [0, 6]
+	syscall
+	
+	sll $a0, $a0, 2 # multiply by 4
+	sw $a0, 8($t9)
+	
+	li $v0, 42  
+	li $a0, 0  
+	div $t5, $t2, 960 # div by 48 to get rows, then div by 20
+	add $a1, $t5, $zero	
+	syscall
+	
+	sw $a0, 12($t9)
+	j generate_return
+
+generate3:
+	div $t6, $t1, 48
+	ble $t6, 20, generate_return
+	
+	li $v0, 42  
+	li $a0, 0  
+	li $a1, 6 # random position [0, 6]
+	syscall
+	
+	sll $a0, $a0, 2 # multiply by 4
+	sw $a0, 0($t9)
+	
+	li $v0, 42  
+	li $a0, 0  
+	div $t5, $t1, 960 # div by 48 to get rows, then div by 20
+	add $a1, $t5, $zero	
+	syscall
+	
+	sw $a0, 4($t9)
+	j generate_return
+		
+###################################
+DRAW_LLANE_CAR:
+	# $a0 = car position
+	add $t0, $a0, $zero	# $t0 = car position
+	addi $sp, $sp, -4	# push $ra
+	sw $ra, 0($sp)
+	
+	lw $a1, blue	# blue for opponent car
+	jal draw_car_rect
+	
+	addi $a0, $t0, 516
+	jal draw_window
+	
+	addi $a0, $t0, 1540
+	jal draw_window
+	
+	lw $ra, 0($sp)		# pop $ra
+	addi $sp, $sp, 4
+	
+	jr $ra
+	
+DRAW_RLANE_CAR:
+	# $a0 = car position
+	add $t0, $a0, $zero	# $t0 = car position
+	addi $sp, $sp, -4	# push $ra
+	sw $ra, 0($sp)
+	
+	lw $a1, blue	# blue for opponent car
+	jal draw_car_rect
+	
+	addi $a0, $t0, 772
+	jal draw_window
+	
+	addi $a0, $t0, 1796
+	jal draw_window
+	
+	lw $ra, 0($sp)		# pop $ra
+	addi $sp, $sp, 4
+	
+	jr $ra
+	
 ###################################
 DRAW_PLAYER_CAR: # car is 6x11
 	addi $sp, $sp, -4	# push $ra
