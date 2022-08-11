@@ -327,8 +327,13 @@ level2_completed_display: .word 0xfbb236, 0xfbb236, 0x272f36, 0x272f36, 0x272f36
 0xfbb236, 0xfbb236, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x333a3f, 0x333a3f, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0xfbb236, 0xfbb236, 
 0xfbb236, 0xfbb236, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x333a3f, 0x333a3f, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0x272f36, 0xfbb236, 0xfbb236
 
-level1_car_probs: .word 5, 30, 75 # increase to decrease spawn rate
+level1_car_probs: .word 10, 50, 100 # increase to decrease spawn rate
 level2_car_probs: .word 5, 10, 20
+
+health_pickups:	.word -1, -1, -1, -1
+star_pickups: .word -1, -1, -1, -1
+
+invincibility_count: .word 0
 
 .text
 
@@ -384,6 +389,7 @@ level1_loop:
 
 	li $a0, 1
 	jal GENERATE_CARS
+	jal GENERATE_PICKUPS
 	
 	jal ERASE_PLAYER_CAR
 	jal draw_road_lines
@@ -402,13 +408,15 @@ level1_loop:
 	
 	# check for collision
 	jal CHECK_COLLISION
-	
+
 	jal ERASE_HEARTS
 	jal draw_road_lines
 	jal draw_white_dashes
 	
 	# update location of other vehicles
 	jal CLEAR_LANES
+	jal UPDATE_PICKUPS
+	jal DRAW_PICKUPS
 	jal UPDATE_BLUE_CARS
 	jal DRAW_BLUE_CARS
 	jal COPY_LANES_TO_DISPLAY
@@ -469,10 +477,20 @@ keypress_happened:
 	beq $t2, 115, slow_down		# respond to 's'
 
 move_left:
+	li $t8, 256
+	div $s5, $t8
+	mfhi $t9
+	addi $t9, $t9, -12
+	blt $t9, 0, keypress_done
 	add $s5, $s5, -12
 	j keypress_done
 
 move_right:
+	li $t8, 256
+	div $s5, $t8
+	mfhi $t9
+	addi $t9, $t9, 12
+	bgt $t9, 256, keypress_done
 	add $s5, $s5, 12
 	j keypress_done
 	
@@ -491,31 +509,40 @@ slow_down:
 CHECK_COLLISION:
 	lw $t0, roadside_yellow
 	lw $t1, blue
+	lw $t2, window_blue
 	
 	lw $t5, -256($s5)
 	beq $t5, $t0, collision_detected
 	beq $t5, $t1, collision_detected
+	beq $t5, $t2, collision_detected
 	lw $t5, -236($s5)
 	beq $t5, $t0, collision_detected
 	beq $t5, $t1, collision_detected
+	beq $t5, $t2, collision_detected
 	lw $t5, -4($s5)
 	beq $t5, $t0, collision_detected
 	beq $t5, $t1, collision_detected
+	beq $t5, $t2, collision_detected
 	lw $t5, 24($s5)
 	beq $t5, $t0, collision_detected
 	beq $t5, $t1, collision_detected
+	beq $t5, $t2, collision_detected
 	lw $t5, 2812($s5)
 	beq $t5, $t0, collision_detected
 	beq $t5, $t1, collision_detected
+	beq $t5, $t2, collision_detected
 	lw $t5, 3072($s5)
 	beq $t5, $t0, collision_detected
 	beq $t5, $t1, collision_detected
+	beq $t5, $t2, collision_detected
 	lw $t5, 3092($s5)
 	beq $t5, $t0, collision_detected
 	beq $t5, $t1, collision_detected
+	beq $t5, $t2, collision_detected
 	lw $t5, 2840($s5)
 	beq $t5, $t0, collision_detected
 	beq $t5, $t1, collision_detected
+	beq $t5, $t2, collision_detected
 	
 	jr $ra # no collision detected - just return
 	
@@ -567,7 +594,380 @@ game_over_input:
 	beq $t2, 113, end
 	j game_over_prompt
 	
-#-----------------------------------
+#####################################
+
+GENERATE_PICKUPS:
+
+	li $v0, 42
+	li $a0, 0
+	li $a1, 10
+	syscall
+	
+	beq $a0, 0, generate_health
+	beq $a0, 5, generate_star
+	
+generate_pickup_return: jr $ra
+
+generate_star: # star pickups are 7x7
+
+	la $t0, health_pickups
+	la $t2, star_pickups
+	
+	li $v0, 42
+	li $a0, 0
+	li $a1, 70 # reduce spawn rate
+	syscall
+	
+	beq $a0, 0, lane1_star
+	beq $a0, 1, lane2_star
+	beq $a0, 2, lane3_star
+	beq $a0, 3, lane3_star
+	j generate_pickup_return
+	
+lane1_star:
+	lw $t1, 0($t2) # position of lane 1 star
+	bne $t1, -1, generate_pickup_return # if star already exists return
+	
+	lw $t3, 0($t0) # position of lane 1 health
+	beq $t3, -1, s1_cond
+	blt, $t3, 528, generate_pickup_return
+s1_cond:
+	li $v0, 42  
+	li $a0, 0  
+	li $a1, 7 # [0, 7]
+	syscall
+
+	sll $a0, $a0, 2
+	
+	sw $a0, 0($t2)
+	j generate_pickup_return
+	
+lane2_star:
+	lw $t1, 4($t2)
+	bne $t1, -1, generate_pickup_return
+	
+	lw $t3, 4($t0)
+	beq $t3, -1, s2_cond
+	blt, $t3, 528, generate_pickup_return
+s2_cond: 
+	li $v0, 42  
+	li $a0, 0  
+	li $a1, 7 # [0, 7]
+	syscall
+	
+	sll $a0, $a0, 2
+	
+	sw $a0, 4($t2)
+	j generate_pickup_return
+	
+lane3_star:
+	lw $t1, 8($t2)
+	bne $t1, -1, generate_pickup_return
+	
+	lw $t3, 8($t0)
+	bgt, $t3, 3600, generate_pickup_return
+	
+	li $v0, 42  
+	li $a0, 0  
+	li $a1, 7 # [0, 7]
+	syscall
+	
+	sll $a0, $a0, 2
+	
+	addi $a0, $a0, 3744
+	sw $a0, 8($t2)
+	j generate_pickup_return
+	
+lane4_star:
+	lw $t1, 12($t2)
+	bne $t1, -1, generate_pickup_return
+	
+	lw $t3, 12($t0)
+	bgt, $t3, 3600, generate_pickup_return
+	
+	li $v0, 42  
+	li $a0, 0  
+	li $a1, 7 # [0, 7]
+	syscall
+
+	sll $a0, $a0, 2
+	
+	addi $a0, $a0, 3744
+	sw $a0, 12($t2)
+	j generate_pickup_return
+
+generate_health: # health pickups are 6x6
+	
+	la $t0, health_pickups
+	la $t2, star_pickups
+	
+	li $v0, 42
+	li $a0, 0
+	li $a1, 70 # reduce spawn rate
+	syscall
+	
+	beq $a0, 0, lane1_health
+	beq $a0, 1, lane2_health
+	beq $a0, 2, lane3_health
+	beq $a0, 3, lane3_health
+	j generate_pickup_return
+	
+lane1_health:
+	lw $t1, 0($t0)
+	bne $t1, -1, generate_pickup_return
+	
+	lw $t3, 0($t2)
+	beq $t3, -1, h1_cond
+	blt, $t3, 528, generate_pickup_return
+h1_cond: 
+	li $v0, 42  
+	li $a0, 0  
+	li $a1, 7 # [0, 7]
+	syscall
+	
+	sll $a0, $a0, 2
+	
+	sw $a0, 0($t0)
+	j generate_pickup_return
+	
+lane2_health:
+	lw $t1, 4($t0)
+	bne $t1, -1, generate_pickup_return
+	
+	lw $t3, 4($t2)
+	beq $t3, -1, h2_cond
+	blt, $t3, 528, generate_pickup_return
+h2_cond: 
+	li $v0, 42  
+	li $a0, 0  
+	li $a1, 7 # [0, 7]
+	syscall
+	
+	sll $a0, $a0, 2
+	
+	sw $a0, 4($t0)
+	j generate_pickup_return
+	
+lane3_health:
+	lw $t1, 8($t0)
+	bne $t1, -1, generate_pickup_return
+	
+	lw $t3, 8($t2)
+	bgt, $t3, 3600, generate_pickup_return
+	
+	li $v0, 42  
+	li $a0, 0  
+	li $a1, 7 # [0, 7]
+	syscall
+
+	sll $a0, $a0, 2
+	
+	addi $a0, $a0, 3744
+	sw $a0, 8($t0)
+	j generate_pickup_return
+	
+lane4_health:
+	lw $t1, 12($t0)
+	bne $t1, -1, generate_pickup_return
+	
+	lw $t3, 12($t2)
+	bgt, $t3, 3600, generate_pickup_return
+	
+	li $v0, 42  
+	li $a0, 0  
+	li $a1, 7 # [0, 7]
+	syscall
+
+	sll $a0, $a0, 2
+	
+	addi $a0, $a0, 3744
+	sw $a0, 12($t0)
+	j generate_pickup_return
+	
+DRAW_PICKUPS:
+	addi $sp, $sp, -4	# push $ra
+	sw $ra, 0($sp)
+
+	la $t0, health_pickups
+	
+	lw $a0, 0($t0)
+	la $a1, lane1
+	jal draw_health_pickup
+	
+	lw $a0, 4($t0)
+	la $a1, lane2
+	jal draw_health_pickup
+	
+	lw $a0, 8($t0)
+	la $a1, lane3
+	jal draw_health_pickup
+	
+	lw $a0, 12($t0)
+	la $a1, lane4
+	jal draw_health_pickup
+	
+	la $t7, star_pickups
+	
+	lw $a0, 0($t7)
+	la $a1, lane1
+	jal draw_star_pickup
+	
+	lw $a0, 4($t7)
+	la $a1, lane2
+	jal draw_star_pickup
+	
+	lw $a0, 8($t7)
+	la $a1, lane3
+	jal draw_star_pickup
+	
+	lw $a0, 12($t7)
+	la $a1, lane4
+	jal draw_star_pickup
+	
+	
+	lw $ra, 0($sp)		# pop $ra
+	addi $sp, $sp, 4
+	jr $ra
+	
+draw_health_pickup: 
+	# $a0 = top left position
+	# $a1 = address of lane display
+	bne $a0, -1, draw_health_cond
+	jr $ra
+draw_health_cond:
+	add $a0, $a0, $a1
+	
+	li $t1, 0x00ff1a # green
+	
+	sw $t1, 8($a0)
+	sw $t1, 12($a0)
+	sw $t1, 56($a0)
+	sw $t1, 60($a0)
+	
+	sw $t1, 96($a0)
+	sw $t1, 100($a0)
+	sw $t1, 104($a0)
+	sw $t1, 108($a0)
+	sw $t1, 112($a0)
+	sw $t1, 116($a0)
+	
+	sw $t1, 144($a0)
+	sw $t1, 148($a0)
+	sw $t1, 152($a0)
+	sw $t1, 156($a0)
+	sw $t1, 160($a0)
+	sw $t1, 164($a0)
+	
+	sw $t1, 200($a0)
+	sw $t1, 204($a0)
+	sw $t1, 248($a0)
+	sw $t1, 252($a0)
+	
+	jr $ra
+	
+draw_star_pickup: 
+	# $a0 = top left position
+	# a1 = address of lane array
+	bne $a0, -1, draw_star_cond
+	jr $ra
+draw_star_cond:
+	add $a0, $a0, $a1
+	
+	li $t1, 0xffffff # white
+	li $t2, 0xfff300 # yellow
+	
+	sw $t1, 12($a0)
+	sw $t2, 52($a0)
+	sw $t1, 60($a0)
+	sw $t2, 68($a0)
+	sw $t2, 104($a0)
+	sw $t1, 108($a0)
+	sw $t2, 112($a0)
+	
+	sw $t1, 144($a0)
+	sw $t1, 148($a0)
+	sw $t1, 152($a0)
+	sw $t2, 156($a0)
+	sw $t1, 160($a0)
+	sw $t1, 164($a0)
+	sw $t1, 168($a0)
+	
+	sw $t2, 200($a0)
+	sw $t1, 204($a0)
+	sw $t2, 208($a0)
+	sw $t2, 244($a0)
+	sw $t1, 252($a0)
+	sw $t2, 260($a0)
+	sw $t1, 300($a0)
+	
+	jr $ra
+
+UPDATE_PICKUPS:
+	addi $sp, $sp, -4	# push $ra
+	sw $ra, 0($sp)
+	
+	li $t9, 48 # offset for 1 row
+	
+	la $t0, health_pickups
+	la $t1, star_pickups
+	
+	la $a0, 0($t0)
+	jal left_pickup_update
+	
+	la $a0, 4($t0)
+	jal left_pickup_update
+	
+	la $a0, 0($t1)
+	jal left_pickup_update
+	
+	la $a0, 4($t1)
+	jal left_pickup_update
+	
+	la $a0, 8($t0)
+	jal right_pickup_update
+	
+	la $a0, 12($t0)
+	jal right_pickup_update
+	
+	la $a0, 8($t1)
+	jal right_pickup_update
+	
+	la $a0, 12($t1)
+	jal right_pickup_update
+	
+	lw $ra, 0($sp)		# pop $ra
+	addi $sp, $sp, 4
+	jr $ra
+
+left_pickup_update: # $a0 = address of position of pickup
+	
+	lw $t2, 0($a0)
+	beq $t2, -1, left_update_return
+	mult $s6, $t9
+	mflo $t8
+	add $t2, $t2, $t8
+	blt $t2, 3600, left_update_return
+	li $t2, -1
+	
+left_update_return:
+	sw $t2, 0($a0)
+	jr $ra
+	
+right_pickup_update: # $a0 = address of position of pickup
+	
+	lw $t2, 0($a0)
+	beq $t2, -1, right_update_return
+	mult $s6, $t9
+	mflo $t8
+	sub $t2, $t2, $t8
+	bgt $t2, 240, right_update_return
+	li $t2, -1
+	
+right_update_return:
+	sw $t2, 0($a0)
+	jr $ra
+
+#####################################
 
 COPY_LANES_TO_DISPLAY:
 	addi $sp, $sp, -4	# push $ra
