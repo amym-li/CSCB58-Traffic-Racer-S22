@@ -139,7 +139,7 @@ main_loop:
 	li $a0, 100
 	syscall 
 	
-	bgt $s7, 1001, end	# CHANGE IF CHANGING MAX CYCLES
+	bgt $s7, 2030, end	# CHANGE IF CHANGING MAX CYCLES
 	j main_loop
 
 j end
@@ -545,9 +545,9 @@ generate1:
 	# only generates a car if $a0 = 0
 	li $v0, 42  
 	li $a0, 0  
-	li $a1, 2	# INCREASE TO DECREASE SPAWN RATE
+	li $a1, 10	# INCREASE TO DECREASE SPAWN RATE
 	syscall
-	bne $a0, 1, generate_return
+	bne $a0, 7, generate_return
 	
 	li $v0, 42  
 	li $a0, 0  
@@ -571,9 +571,9 @@ generate2:
 	# reduces the chance of 2 cars in one lane
 	li $v0, 42  
 	li $a0, 0  
-	li $a1, 20	# INCREASE TO DECREASE SPAWN RATE
+	li $a1, 50	# INCREASE TO DECREASE SPAWN RATE
 	syscall
-	bne $a0, 17, generate_return
+	bne $a0, 27, generate_return
 	
 	div $t4, $t2, 48
 	ble $t4, 25, generate_return
@@ -601,9 +601,9 @@ generate3:
 	# reduces the chance of 3 cars in one lane
 	li $v0, 42  
 	li $a0, 0  
-	li $a1, 50	# INCREASE TO DECREASE SPAWN RATE
+	li $a1, 100	# INCREASE TO DECREASE SPAWN RATE
 	syscall
-	bne $a0, 41, generate_return
+	bne $a0, 67, generate_return
 	
 	div $t6, $t1, 48
 	ble $t6, 25, generate_return
@@ -904,7 +904,7 @@ DRAW_PROGRESS_BAR:
 	# colors in progress
 	lw $t0, pbar_color
 	addi $t1, $s1, 908
-	div $t3, $s7, 40	# CHANGE IF CHANGING MAX CYCLES
+	div $t3, $s7, 80	# CHANGE IF CHANGING MAX CYCLES ( i = MAX CYCLES/25 )
 	li $t2, 0 # j = 0
 	pb_loop2:
 		sw $t0, 0($t1)
