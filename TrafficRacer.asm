@@ -2,7 +2,7 @@
 # CSCB58 Summer 2022 Project 
 # University of Toronto, Scarborough 
 # 
-# Student Name: Amy Li, Student Number: 1008434464, UTorID: liamy22
+# Student Name: Amy Li, Student Number: ---------, UTorID: ----------
 # 
 # Bitmap Display Configuration: 
 # - Unit width in pixels: 4 (update this as needed) 
@@ -22,7 +22,7 @@
 # c) Add a more challenging level that starts when the player completes the first level  
 #  
 # Link to the video demo 
-# https://utoronto.zoom.us/rec/play/2QwR12xrPkf3u0nUluy9BtTJwMOEL3Owp8TPOXh62c12B501tqDcAK_SXr0-SYxy13YpX6kyiI8qTzI8.hZFzc7ONT9H5e68m
+# ----------------------
 # 
 # Any additional information that the TA needs to know: 
 # - There are 4 speeds
