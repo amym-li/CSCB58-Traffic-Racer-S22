@@ -382,6 +382,9 @@ start_level1:
 	li $s7, 0		# current cycles = 0
 	
 	jal initialize_lane_arrays
+	jal initialize_pickup_arrays
+	
+	sw $zero, invincibility_count
 	
 	jal DRAW_START_BKGD	# colors in pavement and draws road lines
 	jal DRAW_PLAYER_CAR
@@ -493,7 +496,7 @@ move_right:
 	div $s5, $t8
 	mfhi $t9
 	addi $t9, $t9, 12
-	bgt $t9, 256, keypress_done
+	bgt $t9, 232, keypress_done
 	add $s5, $s5, 12
 	j keypress_done
 	
@@ -511,13 +514,6 @@ slow_down:
 
 CHECK_COLLISION:
 
-	lw $t9, invincibility_count
-	beq $t9, 0, not_invincible
-	addi $t9, $t9, -1
-	jr $ra
-	
-not_invincible:
-
 	addi $sp, $sp, -4	# push $ra
 	sw $ra, 0($sp)
 	
@@ -528,6 +524,22 @@ not_invincible:
 	lw $t4, star_pickup_color
 	
 	jal check_health_pickup
+	
+	lw $ra, 0($sp)		# pop $ra
+	addi $sp, $sp, 4
+	
+	lw $t9, invincibility_count
+	beq $t9, 0, not_invincible
+	addi $t9, $t9, -1
+	sw $t9, invincibility_count
+	jr $ra
+	
+not_invincible:
+
+	addi $sp, $sp, -4	# push $ra
+	sw $ra, 0($sp)
+	
+	jal check_star_pickup
 	
 	lw $t5, -256($s5)
 	beq $t5, $t0, collision_detected
@@ -566,6 +578,52 @@ not_invincible:
 	addi $sp, $sp, 4
 	jr $ra # no collision detected - just return
 	
+check_star_pickup:
+
+	lw $t5, -256($s5)
+	beq $t5, $t4, if_star_pickup
+	lw $t5, -236($s5)
+	beq $t5, $t4, if_star_pickup
+	lw $t5, -4($s5)
+	beq $t5, $t4, if_star_pickup
+	lw $t5, 24($s5)
+	beq $t5, $t4, if_star_pickup
+	lw $t5, 2812($s5)
+	beq $t5, $t4, if_star_pickup
+	lw $t5, 3072($s5)
+	beq $t5, $t4, if_star_pickup
+	lw $t5, 3092($s5)
+	beq $t5, $t4, if_star_pickup
+	lw $t5, 2840($s5)
+	beq $t5, $t4, if_star_pickup
+	
+	jr $ra
+	
+if_star_pickup:
+	beq $s4, 6, remove_star_pickup
+	li $t6, 50 # duration of invincibility
+	sw $t6, invincibility_count
+	
+remove_star_pickup:
+
+	sub $t6, $s5, $s1
+	li $t8, 256
+	div $t6, $t8
+	mfhi $t7
+	
+	la $t6, star_pickups
+	blt $t7, 41, star_pickup_done
+	addi $t6, $t6, 4
+	blt $t7, 101, star_pickup_done
+	addi $t6, $t6, 4
+	blt $t7, 180, star_pickup_done
+	addi $t6, $t6, 4
+	
+star_pickup_done: 
+	li $t8, -1
+	sw $t8, 0($t6)
+	jr $ra
+	
 check_health_pickup:
 	
 	lw $t5, -256($s5)
@@ -599,11 +657,11 @@ remove_health_pickup:
 	mfhi $t7
 	
 	la $t6, health_pickups
-	blt $t7, 40, health_pickup_done
+	blt $t7, 37, health_pickup_done
 	addi $t6, $t6, 4
-	blt $t7, 100, health_pickup_done
+	blt $t7, 97, health_pickup_done
 	addi $t6, $t6, 4
-	blt $t7, 164, health_pickup_done
+	blt $t7, 175, health_pickup_done
 	addi $t6, $t6, 4
 	
 health_pickup_done: 
@@ -699,7 +757,7 @@ lane1_star:
 s1_cond:
 	li $v0, 42  
 	li $a0, 0  
-	li $a1, 5 # [0, 5]
+	li $a1, 1
 	syscall
 
 	sll $a0, $a0, 2
@@ -717,7 +775,7 @@ lane2_star:
 s2_cond: 
 	li $v0, 42  
 	li $a0, 0  
-	li $a1, 5 # [0, 5]
+	li $a1, 1
 	syscall
 	
 	sll $a0, $a0, 2
@@ -734,7 +792,7 @@ lane3_star:
 	
 	li $v0, 42  
 	li $a0, 0  
-	li $a1, 5 # [0, 5]
+	li $a1, 1
 	syscall
 	
 	sll $a0, $a0, 2
@@ -752,7 +810,7 @@ lane4_star:
 	
 	li $v0, 42  
 	li $a0, 0  
-	li $a1, 5 # [0, 5]
+	li $a1, 1
 	syscall
 
 	sll $a0, $a0, 2
@@ -768,7 +826,7 @@ generate_health: # health pickups are 6x6
 	
 	li $v0, 42
 	li $a0, 0
-	li $a1, 50 # reduce spawn rate
+	li $a1, 30 # reduce spawn rate
 	syscall
 	
 	beq $a0, 0, lane1_health
@@ -787,7 +845,7 @@ lane1_health:
 h1_cond: 
 	li $v0, 42  
 	li $a0, 0  
-	li $a1, 6 # [0, 6]
+	li $a1, 1
 	syscall
 	
 	sll $a0, $a0, 2
@@ -805,7 +863,7 @@ lane2_health:
 h2_cond: 
 	li $v0, 42  
 	li $a0, 0  
-	li $a1, 6 # [0, 6]
+	li $a1, 1
 	syscall
 	
 	sll $a0, $a0, 2
@@ -822,7 +880,7 @@ lane3_health:
 	
 	li $v0, 42  
 	li $a0, 0  
-	li $a1, 6 # [0, 6]
+	li $a1, 1
 	syscall
 
 	sll $a0, $a0, 2
@@ -840,7 +898,7 @@ lane4_health:
 	
 	li $v0, 42  
 	li $a0, 0  
-	li $a1, 6 # [0, 6]
+	li $a1, 1
 	syscall
 
 	sll $a0, $a0, 2
@@ -1603,6 +1661,9 @@ DRAW_PLAYER_CAR: # car is 6x11
 	addi $sp, $sp, -4	# push $ra
 	sw $ra, 0($sp)
 	
+	lw $t0, invincibility_count
+	bgt $t0, $zero, hide_car
+	
 	add $a0, $s5, $zero
 	lw $a1, red		# red for car
 	jal draw_car_rect
@@ -1612,11 +1673,20 @@ DRAW_PLAYER_CAR: # car is 6x11
 	
 	addi $a0, $s5, 1796
 	jal draw_window
-	
+	j draw_player_return
+
+hide_car:
+	add $a0, $s5, $zero
+	li $a1, 0x000000
+	jal draw_car_rect
+		
+draw_player_return:
 	lw $ra, 0($sp)		# pop $ra
 	addi $sp, $sp, 4
 	
 	jr $ra
+	
+
 	
 draw_car_rect: 
 	# $a0 = top left pixel
@@ -1903,6 +1973,20 @@ DRAW_PROGRESS_BAR:
 	pb_done: jr $ra
 
 ####################################
+
+initialize_pickup_arrays:
+	li $t1, -1
+	la $t0, health_pickups
+	sw $t1, 0($t0)
+	sw $t1, 4($t0)
+	sw $t1, 8($t0)
+	sw $t1, 12($t0)
+	la $t0, star_pickups
+	sw $t1, 0($t0)
+	sw $t1, 4($t0)
+	sw $t1, 8($t0)
+	sw $t1, 12($t0)
+	jr $ra
 
 initialize_lane_arrays:
 	li $t1, -1
