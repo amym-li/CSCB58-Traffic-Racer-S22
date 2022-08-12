@@ -5,10 +5,10 @@
 # Student Name: Amy Li, Student Number: 1008434464, UTorID: liamy22
 # 
 # Bitmap Display Configuration: 
-# - Unit width in pixels: 8 (update this as needed) 
-# - Unit height in pixels: 8 (update this as needed) 
-# - Display width in pixels: 512 (update this as needed) 
-# - Display height in pixels: 512 (update this as needed) 
+# - Unit width in pixels: 4 (update this as needed) 
+# - Unit height in pixels: 4 (update this as needed) 
+# - Display width in pixels: 256 (update this as needed) 
+# - Display height in pixels: 256 (update this as needed) 
 # - Base Address for Display: 0x10008000 
 # 
 # Basic features that were implemented successfully 
@@ -22,10 +22,13 @@
 # c) Add a more challenging level that starts when the player completes the first level  
 #  
 # Link to the video demo 
-# - Insert YouTube/MyMedia/other URL here and make sure the video is accessible 
+# https://utoronto.zoom.us/rec/play/2QwR12xrPkf3u0nUluy9BtTJwMOEL3Owp8TPOXh62c12B501tqDcAK_SXr0-SYxy13YpX6kyiI8qTzI8.hZFzc7ONT9H5e68m
 # 
 # Any additional information that the TA needs to know: 
-# - Write here, if any 
+# - There are 4 speeds
+# - Use w and s to speed up and slow down respectively
+# - Use a and d to move left and right respectively
+# - There are 2 pickups: extra life and invincibility
 #  
 ######################################################################
 
@@ -60,6 +63,7 @@ window_blue:	.word 	0xbee9fa
 
 health_pickup_green: 	.word 	0x00ff1a
 star_pickup_color: 	.word 	0xfff300
+star_pickup_color_white: .word 0xe1ffff
 
 #car_starting_pos:	.word	0x10009D70
 #roadside_collision:	.word	0 # 0 for false, 1 for true
@@ -612,9 +616,12 @@ CHECK_COLLISION:
 	lw $t1, blue
 	lw $t2, window_blue
 	lw $t3, health_pickup_green 
-	lw $t4, star_pickup_color
 	
 	jal check_health_pickup
+	
+	lw $t4, star_pickup_color
+	lw $t3, star_pickup_color_white
+	jal check_star_pickup
 	
 	lw $ra, 0($sp)		# pop $ra
 	addi $sp, $sp, 4
@@ -629,8 +636,6 @@ not_invincible:
 
 	addi $sp, $sp, -4	# push $ra
 	sw $ra, 0($sp)
-	
-	jal check_star_pickup
 	
 	lw $t5, -256($s5)
 	beq $t5, $t0, collision_detected
@@ -673,26 +678,40 @@ check_star_pickup:
 
 	lw $t5, -256($s5)
 	beq $t5, $t4, if_star_pickup
+	beq $t5, $t3, if_star_pickup
 	lw $t5, -236($s5)
 	beq $t5, $t4, if_star_pickup
+	beq $t5, $t3, if_star_pickup
 	lw $t5, -4($s5)
 	beq $t5, $t4, if_star_pickup
+	beq $t5, $t3, if_star_pickup
 	lw $t5, 24($s5)
 	beq $t5, $t4, if_star_pickup
+	beq $t5, $t3, if_star_pickup
+	lw $t5, 1532($s5)
+	beq $t5, $t4, if_star_pickup
+	beq $t5, $t3, if_star_pickup
+	lw $t5, 1564($s5)
+	beq $t5, $t4, if_star_pickup
+	beq $t5, $t3, if_star_pickup
 	lw $t5, 2812($s5)
 	beq $t5, $t4, if_star_pickup
+	beq $t5, $t3, if_star_pickup
 	lw $t5, 3072($s5)
 	beq $t5, $t4, if_star_pickup
+	beq $t5, $t3, if_star_pickup
 	lw $t5, 3092($s5)
 	beq $t5, $t4, if_star_pickup
+	beq $t5, $t3, if_star_pickup
 	lw $t5, 2840($s5)
 	beq $t5, $t4, if_star_pickup
+	beq $t5, $t3, if_star_pickup
 	
 	jr $ra
 	
 if_star_pickup:
-	beq $s4, 6, remove_star_pickup
-	li $t6, 50 # duration of invincibility
+	lw $t6, invincibility_count
+	addi $t6, $t6, 70 # duration of invincibility
 	sw $t6, invincibility_count
 	
 remove_star_pickup:
@@ -732,6 +751,10 @@ check_health_pickup:
 	lw $t5, 3092($s5)
 	beq $t5, $t3, if_health_pickup
 	lw $t5, 2840($s5)
+	beq $t5, $t3, if_health_pickup
+	lw $t5, 1532($s5)
+	beq $t5, $t3, if_health_pickup
+	lw $t5, 1564($s5)
 	beq $t5, $t3, if_health_pickup
 	
 	jr $ra
@@ -1084,7 +1107,7 @@ draw_star_pickup:
 draw_star_cond:
 	add $a0, $a0, $a1
 	
-	li $t1, 0xffffff # white
+	lw $t1, star_pickup_color_white
 	lw $t2, star_pickup_color
 	
 	sw $t1, 12($a0)
