@@ -54,6 +54,9 @@ red:		.word	0xFF0000
 blue:		.word	0x5b6ee1
 window_blue:	.word 	0xbee9fa
 
+health_pickup_green: 	.word 	0x00ff1a
+star_pickup_color: 	.word 	0xfff300
+
 #car_starting_pos:	.word	0x10009D70
 #roadside_collision:	.word	0 # 0 for false, 1 for true
 
@@ -507,9 +510,24 @@ slow_down:
 ###################################
 
 CHECK_COLLISION:
+
+	lw $t9, invincibility_count
+	beq $t9, 0, not_invincible
+	addi $t9, $t9, -1
+	jr $ra
+	
+not_invincible:
+
+	addi $sp, $sp, -4	# push $ra
+	sw $ra, 0($sp)
+	
 	lw $t0, roadside_yellow
 	lw $t1, blue
 	lw $t2, window_blue
+	lw $t3, health_pickup_green 
+	lw $t4, star_pickup_color
+	
+	jal check_health_pickup
 	
 	lw $t5, -256($s5)
 	beq $t5, $t0, collision_detected
@@ -544,8 +562,55 @@ CHECK_COLLISION:
 	beq $t5, $t1, collision_detected
 	beq $t5, $t2, collision_detected
 	
+	lw $ra, 0($sp)		# pop $ra
+	addi $sp, $sp, 4
 	jr $ra # no collision detected - just return
 	
+check_health_pickup:
+	
+	lw $t5, -256($s5)
+	beq $t5, $t3, if_health_pickup
+	lw $t5, -236($s5)
+	beq $t5, $t3, if_health_pickup
+	lw $t5, -4($s5)
+	beq $t5, $t3, if_health_pickup
+	lw $t5, 24($s5)
+	beq $t5, $t3, if_health_pickup
+	lw $t5, 2812($s5)
+	beq $t5, $t3, if_health_pickup
+	lw $t5, 3072($s5)
+	beq $t5, $t3, if_health_pickup
+	lw $t5, 3092($s5)
+	beq $t5, $t3, if_health_pickup
+	lw $t5, 2840($s5)
+	beq $t5, $t3, if_health_pickup
+	
+	jr $ra
+	
+if_health_pickup:
+	beq $s4, 6, remove_health_pickup
+	addi $s4, $s4, 1
+	
+remove_health_pickup:
+
+	sub $t6, $s5, $s1
+	li $t8, 256
+	div $t6, $t8
+	mfhi $t7
+	
+	la $t6, health_pickups
+	blt $t7, 40, health_pickup_done
+	addi $t6, $t6, 4
+	blt $t7, 100, health_pickup_done
+	addi $t6, $t6, 4
+	blt $t7, 164, health_pickup_done
+	addi $t6, $t6, 4
+	
+health_pickup_done: 
+	li $t8, -1
+	sw $t8, 0($t6)
+	jr $ra
+
 collision_detected:
 	
 	li $t0, 2 # roadside flash red for 2 cycles
@@ -615,7 +680,7 @@ generate_star: # star pickups are 7x7
 	
 	li $v0, 42
 	li $a0, 0
-	li $a1, 70 # reduce spawn rate
+	li $a1, 60 # reduce spawn rate
 	syscall
 	
 	beq $a0, 0, lane1_star
@@ -634,7 +699,7 @@ lane1_star:
 s1_cond:
 	li $v0, 42  
 	li $a0, 0  
-	li $a1, 7 # [0, 7]
+	li $a1, 5 # [0, 5]
 	syscall
 
 	sll $a0, $a0, 2
@@ -652,7 +717,7 @@ lane2_star:
 s2_cond: 
 	li $v0, 42  
 	li $a0, 0  
-	li $a1, 7 # [0, 7]
+	li $a1, 5 # [0, 5]
 	syscall
 	
 	sll $a0, $a0, 2
@@ -669,7 +734,7 @@ lane3_star:
 	
 	li $v0, 42  
 	li $a0, 0  
-	li $a1, 7 # [0, 7]
+	li $a1, 5 # [0, 5]
 	syscall
 	
 	sll $a0, $a0, 2
@@ -687,7 +752,7 @@ lane4_star:
 	
 	li $v0, 42  
 	li $a0, 0  
-	li $a1, 7 # [0, 7]
+	li $a1, 5 # [0, 5]
 	syscall
 
 	sll $a0, $a0, 2
@@ -703,7 +768,7 @@ generate_health: # health pickups are 6x6
 	
 	li $v0, 42
 	li $a0, 0
-	li $a1, 70 # reduce spawn rate
+	li $a1, 50 # reduce spawn rate
 	syscall
 	
 	beq $a0, 0, lane1_health
@@ -722,7 +787,7 @@ lane1_health:
 h1_cond: 
 	li $v0, 42  
 	li $a0, 0  
-	li $a1, 7 # [0, 7]
+	li $a1, 6 # [0, 6]
 	syscall
 	
 	sll $a0, $a0, 2
@@ -740,7 +805,7 @@ lane2_health:
 h2_cond: 
 	li $v0, 42  
 	li $a0, 0  
-	li $a1, 7 # [0, 7]
+	li $a1, 6 # [0, 6]
 	syscall
 	
 	sll $a0, $a0, 2
@@ -757,7 +822,7 @@ lane3_health:
 	
 	li $v0, 42  
 	li $a0, 0  
-	li $a1, 7 # [0, 7]
+	li $a1, 6 # [0, 6]
 	syscall
 
 	sll $a0, $a0, 2
@@ -775,7 +840,7 @@ lane4_health:
 	
 	li $v0, 42  
 	li $a0, 0  
-	li $a1, 7 # [0, 7]
+	li $a1, 6 # [0, 6]
 	syscall
 
 	sll $a0, $a0, 2
@@ -837,7 +902,7 @@ draw_health_pickup:
 draw_health_cond:
 	add $a0, $a0, $a1
 	
-	li $t1, 0x00ff1a # green
+	lw $t1, health_pickup_green
 	
 	sw $t1, 8($a0)
 	sw $t1, 12($a0)
@@ -874,7 +939,7 @@ draw_star_cond:
 	add $a0, $a0, $a1
 	
 	li $t1, 0xffffff # white
-	li $t2, 0xfff300 # yellow
+	lw $t2, star_pickup_color
 	
 	sw $t1, 12($a0)
 	sw $t2, 52($a0)
