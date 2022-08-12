@@ -44,9 +44,6 @@ displayAddress:		.word	0x10008000
 displayAddressEnd:	.word	0x1000C000
 num_units:		.word	4096
 
-#cycles:			.word 	0
-#max_cycles:		.word	1000
-
 # road colors
 pavement_color:		.word	0x272f36
 white:			.word	0xFFFFFF
@@ -65,16 +62,12 @@ health_pickup_green: 	.word 	0x00ff1a
 star_pickup_color: 	.word 	0xfff300
 star_pickup_color_white: .word 0xe1ffff
 
-#car_starting_pos:	.word	0x10009D70
-#roadside_collision:	.word	0 # 0 for false, 1 for true
-
 # incoming car positions - top left pixel (in lane displays), speed, ...
 # store such that A[0] is closest to spawn point
 lane1_cars:	.space	24
 lane2_cars:	.space	24
 lane3_cars:	.space	24
 lane4_cars:	.space	24
-# max_cars_per_lane:	.word	3
 
 collision_occurred: .word 0
 
